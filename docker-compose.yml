@@ -9,22 +9,21 @@ services:
     restart: unless-stopped
     working_dir: /var/www/html
     environment:
-      - DB_CONNECTION=mysql
-      - DB_HOST=db
-      - DB_PORT=3306
-      - DB_DATABASE=${DB_DATABASE:-sampahrey}
-      - DB_USERNAME=${DB_USERNAME:-laravel}
-      - DB_PASSWORD=${DB_PASSWORD:-laravel}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: sampahrey
+      DB_USERNAME: root
+      DB_PASSWORD: root
     volumes:
       - ./:/var/www/html
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - sampahrey
-    env_file:
-      - .env
 
   web:
     image: nginx:1.24-alpine
@@ -41,29 +40,26 @@ services:
       - app
     networks:
       - sampahrey
-    env_file:
-      - .env
 
   db:
     image: mysql:8.0
     container_name: sampahrey-db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${DB_DATABASE:-sampahrey}
-      MYSQL_USER: ${DB_USERNAME:-laravel}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-laravel}
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: sampahrey
     volumes:
-      - ./storage/db:/var/lib/mysql
+      - mysql_data:/var/lib/mysql
     ports:
       - "3306:3306"
     networks:
       - sampahrey
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 20s
 
 networks:
   sampahrey:
@@ -71,4 +67,3 @@ networks:
 
 volumes:
   mysql_data:
-    driver: local
