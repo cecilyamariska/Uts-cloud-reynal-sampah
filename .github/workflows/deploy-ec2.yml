@@ -1,0 +1,48 @@
+name: Deploy to EC2
+
+on:
+	push:
+		branches:
+			- master
+			- main
+	workflow_dispatch:
+
+jobs:
+	build-test-deploy:
+		runs-on: ubuntu-latest
+
+		steps:
+			- name: Checkout
+				uses: actions/checkout@v4
+
+			- name: Setup PHP
+				uses: shivammathur/setup-php@v2
+				with:
+					php-version: '8.3'
+					extensions: dom, curl, libxml, mbstring, zip, pdo, pdo_sqlite
+
+			- name: Install dependencies
+				run: composer install --prefer-dist --no-interaction --no-progress
+
+			- name: Prepare environment for tests
+				run: |
+					cp .env.example .env
+					php artisan key:generate
+					touch database/database.sqlite
+					php artisan migrate --force
+
+			- name: Run tests
+				run: php artisan test
+
+			- name: Deploy via SSH to EC2
+				uses: appleboy/ssh-action@v1.2.2
+				with:
+					host: ${{ secrets.EC2_HOST }}
+					username: ${{ secrets.EC2_USERNAME }}
+					key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+					script: |
+						cd ${{ secrets.EC2_APP_PATH }}
+						git fetch --all
+						git reset --hard origin/${{ github.ref_name }}
+						docker compose down
+						docker compose up -d --build
